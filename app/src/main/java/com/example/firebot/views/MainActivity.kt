@@ -13,7 +13,7 @@ import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.*
 
-class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener, SurfaceHolder.Callback {
+class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener, SurfaceHolder.Callback, JoystickView.JoystickListener {
 
     //activity knows when the rendering surface is ready for use
     //MediaPlayer object handles the RTSP communication and RTP video streaming work
@@ -32,13 +32,15 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener, Surfac
         )
         window.setBackgroundDrawableResource(R.color.black)
         setContentView(R.layout.activity_main)
-        Log.d("Main aktivnost", "Bla")
 
         //Configure the view that renders live video
         val surfaceView = findViewById<View>(R.id.surfaceView) as SurfaceView
         _surfaceHolder = surfaceView.holder
         _surfaceHolder.addCallback(this)
         _surfaceHolder.setFixedSize(320, 240)
+
+        val joystickView = findViewById<JoystickView>(R.id.joystick)
+        joystickView.getBackground().setAlpha(128);  // 50% transparent
     }
 
     override fun onPrepared(p0: MediaPlayer?) {
@@ -94,5 +96,9 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener, Surfac
         const val PASSWORD = "camera"
         const val RTSP_URL = "rtsp://rtsp.stream/pattern"
         //RTSP_URL needs to be updated to camera's local IP address!!
+    }
+
+    override fun onJoystickMoved(xPercent: Float, yPercent: Float, id: Int) {
+        Log.d("Main aktivnost", "$xPercent, $yPercent")
     }
 }

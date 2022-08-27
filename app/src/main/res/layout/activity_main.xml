@@ -6,4 +6,11 @@
         android:id="@+id/surfaceView"
         android:layout_width="fill_parent"
         android:layout_height="fill_parent" />
+    <com.example.firebot.views.JoystickView
+        android:id="@+id/joystick"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:background="@android:color/transparent"
+        android:layout_centerHorizontal="true"
+        android:layout_alignParentBottom="true"/>
 </RelativeLayout>

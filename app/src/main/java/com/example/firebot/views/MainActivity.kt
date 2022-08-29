@@ -1,17 +1,22 @@
 package com.example.firebot.views
 
 import android.content.Context
+import android.content.DialogInterface
+import android.graphics.PixelFormat
 import android.media.MediaPlayer
 import android.net.Uri
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Base64.*
 import android.util.Log
 import android.view.*
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
 import com.example.firebot.R
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.*
+
 
 class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener, SurfaceHolder.Callback, JoystickView.JoystickListener {
 
@@ -19,6 +24,9 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener, Surfac
     //MediaPlayer object handles the RTSP communication and RTP video streaming work
     private var _mediaPlayer: MediaPlayer? = null
     private lateinit var _surfaceHolder: SurfaceHolder
+
+    val negativeButtonClick = { dialog: DialogInterface, which: Int -> }
+    var currentCamera = "1"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,7 +48,30 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener, Surfac
         _surfaceHolder.setFixedSize(320, 240)
 
         val joystickView = findViewById<JoystickView>(R.id.joystick)
-        joystickView.getBackground().setAlpha(128);  // 50% transparent
+        //code to make the view transparent
+        joystickView.setZOrderOnTop(true)
+        val joystickViewHolder = joystickView.holder
+        joystickViewHolder.setFormat(PixelFormat.TRANSPARENT)
+    }
+
+    fun withItems(view: View) {
+        val items = arrayOf("1", "2", "3", "4") //items to be displayed in a list
+        val builder = AlertDialog.Builder(this)
+        with(builder)
+        {
+            setTitle("List of available cameras")
+            setItems(items) { dialog, which ->
+                if (currentCamera == items[which])
+                    Toast.makeText(applicationContext, "$currentCamera is already selected", Toast.LENGTH_SHORT).show()
+                else {
+                    currentCamera = items[which]
+                    Toast.makeText(applicationContext,"Live stream from camera $currentCamera is on", Toast.LENGTH_SHORT).show()
+                }
+            }
+            setNegativeButton("Cancel", negativeButtonClick)
+            setIcon(resources.getDrawable(android.R.drawable.ic_menu_camera, theme))
+            show()
+        }
     }
 
     override fun onPrepared(p0: MediaPlayer?) {
@@ -94,7 +125,7 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener, Surfac
     companion object {
         const val USERNAME = "admin"
         const val PASSWORD = "camera"
-        const val RTSP_URL = "rtsp://rtsp.stream/pattern"
+        const val RTSP_URL = "rtsp://rtsp.stream/stream"
         //RTSP_URL needs to be updated to camera's local IP address!!
     }
 

@@ -12,12 +12,14 @@ import android.view.SurfaceView
 import android.view.View
 
 class JoystickView : SurfaceView, SurfaceHolder.Callback, View.OnTouchListener {
+
     private var centerX = 0f
     private var centerY = 0f
     private var baseRadius = 0f
-    private var hatRadius = 0f
+    private var hatRadius = 0f //the top of the joystick
     private var joystickCallback: JoystickListener? = null
     private val ratio = 5 //The smaller, the more shading will occur
+
     private fun setupDimensions() {
         centerX = (width / 2).toFloat()
         centerY = (height / 2).toFloat()
@@ -27,6 +29,7 @@ class JoystickView : SurfaceView, SurfaceHolder.Callback, View.OnTouchListener {
 
     constructor(context: Context?) : super(context) {
         holder.addCallback(this)
+        //adding this line will cause the SurfaceView to use the onTouch method from this class to handle user screen touches
         setOnTouchListener(this)
         if (context is JoystickListener) joystickCallback = context
     }
@@ -48,6 +51,8 @@ class JoystickView : SurfaceView, SurfaceHolder.Callback, View.OnTouchListener {
     }
 
     private fun drawJoystick(newX: Float, newY: Float) {
+        /*if statement prevents the drawing method from executing when the SurfaceView
+        has not been created on-screen, preventing exceptions at runtime*/
         if (holder.surface.isValid) {
             val myCanvas: Canvas = this.holder.lockCanvas() //Stuff to draw
             val colors = Paint()
@@ -66,9 +71,9 @@ class JoystickView : SurfaceView, SurfaceHolder.Callback, View.OnTouchListener {
             val cos = (newX - centerX) / hypotenuse //cos = a/h
 
             //Draw the base first before shading
-            colors.setARGB(150, 50, 50, 100)
+            colors.setARGB(100, 79, 79, 79)
             myCanvas.drawCircle(centerX, centerY, baseRadius, colors)
-            for (i in 1..(baseRadius / ratio).toInt()) {
+            /*for (i in 1..(baseRadius / ratio).toInt()) {
                 colors.setARGB(
                     150 / i,
                     38,
@@ -81,14 +86,14 @@ class JoystickView : SurfaceView, SurfaceHolder.Callback, View.OnTouchListener {
                     i * (hatRadius * ratio / baseRadius),
                     colors
                 ) //Gradually increase the size of the shading effect
-            }
+            }*/
 
             //Drawing the joystick hat
             for (i in 0..(hatRadius / ratio).toInt()) {
                 colors.setARGB(
-                    100,
-                    (i * (255 * ratio / hatRadius)).toInt(),
-                    (i * (255 * ratio / hatRadius)).toInt(), 255
+                    20,
+                    (i * (33 * ratio / hatRadius)).toInt(),
+                    (i * (37 * ratio / hatRadius)).toInt(), 41
                 ) //Change the joystick color for shading purposes
                 myCanvas.drawCircle(
                     newX,
@@ -107,9 +112,14 @@ class JoystickView : SurfaceView, SurfaceHolder.Callback, View.OnTouchListener {
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
+
     override fun surfaceDestroyed(holder: SurfaceHolder) {}
+
     override fun onTouch(v: View, e: MotionEvent): Boolean {
+        //this makes sure that the touch listener only accepts touches coming from this SurfaceView
         if (v.equals(this)) {
+            /*we need to do this to make sure that the joystick only moves as long as the user is touching the screen,
+            and resets to its original position when the user lets go*/
             if (e.action != MotionEvent.ACTION_UP) {
                 val displacement =
                     Math.sqrt(
@@ -119,7 +129,10 @@ class JoystickView : SurfaceView, SurfaceHolder.Callback, View.OnTouchListener {
                         ) + Math.pow((e.y - centerY).toDouble(), 2.0)
                     )
                         .toFloat()
+                //the click is valid and we don't have to constrain the joystick hat
                 if (displacement < baseRadius) {
+                    //e.x and e.y give the X and Y coordinates, respectively, in pixels where the user touched the screen
+                        //sending them to the drawJoystick method causes the hat of the joystick to be drawn at those positions
                     drawJoystick(e.x, e.y)
                     joystickCallback!!.onJoystickMoved(
                         (e.x - centerX) / baseRadius, (e.y - centerY) / baseRadius,
@@ -138,6 +151,8 @@ class JoystickView : SurfaceView, SurfaceHolder.Callback, View.OnTouchListener {
                 }
             } else drawJoystick(centerX, centerY)
             joystickCallback!!.onJoystickMoved(0f, 0f, id)
+            //this else statement executes when the joystick is released
+            //this resets the joystick to its center position when the user lets go
         }
         return true
     }

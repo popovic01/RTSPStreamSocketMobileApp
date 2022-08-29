@@ -10,7 +10,16 @@
         android:id="@+id/joystick"
         android:layout_width="150dp"
         android:layout_height="150dp"
-        android:background="@android:color/transparent"
-        android:layout_centerHorizontal="true"
+        android:layout_alignParentEnd="true"
         android:layout_alignParentBottom="true"/>
+    <ImageButton
+        android:id="@+id/imgBtnChoice"
+        android:src="@drawable/ic_baseline_photo_camera_24"
+        android:background="@drawable/rounded_corner"
+        android:padding="10dp"
+        android:onClick="withItems"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"/>
 </RelativeLayout>

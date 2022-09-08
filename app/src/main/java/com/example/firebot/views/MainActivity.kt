@@ -17,8 +17,8 @@ import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.*
 
-
-class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener, SurfaceHolder.Callback, JoystickView.JoystickListener {
+class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener, SurfaceHolder.Callback, JoystickView.JoystickListener,
+    MediaPlayer.OnErrorListener {
 
     //activity knows when the rendering surface is ready for use
     //MediaPlayer object handles the RTSP communication and RTP video streaming work
@@ -75,23 +75,28 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener, Surfac
     }
 
     override fun onPrepared(p0: MediaPlayer?) {
+        Log.d("Main aktivnost", "Pocetak")
         _mediaPlayer?.start()
+        Log.d("Main aktivnost", "Kraj")
     }
 
     override fun surfaceCreated(p0: SurfaceHolder) {
         _mediaPlayer = MediaPlayer()
         _mediaPlayer!!.setDisplay(_surfaceHolder)
+
         val context: Context = applicationContext
         val headers: Map<String, String> = getRtspHeaders()
         val source: Uri = Uri.parse(RTSP_URL)
         try {
             //Specify the IP camera's URL and auth headers
-            _mediaPlayer!!.setDataSource(context, source, headers)
+            _mediaPlayer!!.setDataSource("rtsp://192.168.32.161:8554/mystream")
 
             //Begin the process of setting up a video stream
             _mediaPlayer!!.setOnPreparedListener(this)
             _mediaPlayer!!.prepareAsync()
+            Log.d("Main aktivnost", "$_mediaPlayer")
         } catch (e: Exception) {
+            Log.d("Main aktivnost", "${e.message}")
         }
     }
 
@@ -125,11 +130,18 @@ class MainActivity : AppCompatActivity(), MediaPlayer.OnPreparedListener, Surfac
     companion object {
         const val USERNAME = "admin"
         const val PASSWORD = "camera"
-        const val RTSP_URL = "rtsp://rtsp.stream/stream"
+        const val RTSP_URL = "rtsp://192.168.33.212:8554/mystream"
+        //rtsp://localhost:8554/mystream
+        //rtsp://rtsp.stream/pattern
         //RTSP_URL needs to be updated to camera's local IP address!!
     }
 
     override fun onJoystickMoved(xPercent: Float, yPercent: Float, id: Int) {
         Log.d("Main aktivnost", "$xPercent, $yPercent")
+    }
+
+    override fun onError(p0: MediaPlayer?, p1: Int, p2: Int): Boolean {
+        Log.d("Main aktivnost", "ERROR state")
+        return true
     }
 }

@@ -23,9 +23,8 @@
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
         android:layout_alignParentEnd="true"/>
-
     <TextView
-        android:id="@+id/tvInternet"
+        android:id="@+id/tvNoInternet"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"

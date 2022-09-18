@@ -38,6 +38,7 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'org.videolan.android:libvlc-all:3.5.1'
     implementation 'com.github.pwittchen:reactivenetwork-rx2:3.0.8'
+    implementation 'com.squareup.okhttp3:okhttp:3.3.0'
     implementation files('libs/joystickview.jar')
     testImplementation 'junit:junit:'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'

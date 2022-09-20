@@ -1,6 +1,6 @@
 package com.example.firebot.views
 
-import android.content.ContentValues.TAG
+import android.annotation.SuppressLint
 import android.content.DialogInterface
 import android.graphics.PixelFormat
 import android.net.NetworkInfo
@@ -12,11 +12,15 @@ import android.util.Log
 import android.view.View
 import android.view.Window
 import android.view.WindowManager
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProvider
 import com.example.firebot.R
+import com.example.firebot.viewmodels.MainActivityViewModel
 import com.github.pwittchen.reactivenetwork.library.rx2.Connectivity
 import com.github.pwittchen.reactivenetwork.library.rx2.ReactiveNetwork
 import io.reactivex.android.schedulers.AndroidSchedulers
@@ -33,27 +37,24 @@ import java.io.InputStream
 
 class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
 
+    private val TAG: String = "Main activity"
+
     //MediaPlayer object handles the RTSP communication and RTP video streaming work
     private var _mediaPlayer: MediaPlayer? = null
     private var videoLayout: VLCVideoLayout? = null
     private var libVlc: LibVLC? = null
 
+    lateinit var tvInternet: TextView
+    var disconnected: Boolean = false
+
     private val negativeButtonClick = { dialog: DialogInterface, which: Int -> }
     private var currentCamera = "RGB"
-    lateinit var tvNoInternet: TextView
 
-    var startTime: Long = 0
-    var endTime: Long = 0
-    var fileSize: Long = 0
-    var client = OkHttpClient()
-
-    // bandwidth in kbps
-    private val goodBandwidth = 4000
-
+    @SuppressLint("CheckResult")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        //Set up a full-screen black window
+        //set up a full-screen black window
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         val window: Window = window
         window.setFlags(
@@ -63,7 +64,9 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
         window.setBackgroundDrawableResource(R.color.black)
         setContentView(R.layout.activity_main)
 
-        tvNoInternet = findViewById(R.id.tvNoInternet)
+        val viewModel = ViewModelProvider(this).get(MainActivityViewModel::class.java)
+
+        tvInternet = findViewById(R.id.tvInternet)
 
         val joystickView = findViewById<JoystickView>(R.id.joystick)
         //code to make the view transparent
@@ -74,97 +77,77 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
         //observing network state
         ReactiveNetwork
             .observeNetworkConnectivity(applicationContext) //it is better to pass applicationContext
-            .subscribeOn(Schedulers.io())
+            .subscribeOn(Schedulers.io()) //designate worker thread (background) - where the work is going to be done
             //.filter(ConnectivityPredicate.hasType(ConnectivityManager.TYPE_WIFI))
-            .observeOn(AndroidSchedulers.mainThread())
+            .observeOn(AndroidSchedulers.mainThread()) //designate observer thread (main) - where the results are going to be observed from
             .subscribe { connectivity: Connectivity? ->
-                if (connectivity?.state() == NetworkInfo.State.CONNECTED)
+                if (connectivity?.state() == NetworkInfo.State.CONNECTED) {
+                    disconnected = false
                     startVideo() //if device is connected to wifi, start the stream
-                else if (connectivity?.state() == NetworkInfo.State.DISCONNECTED)
-                    stopVideo()
-                else if (connectivity?.state() == NetworkInfo.State.CONNECTED)
-                Log.d("Main aktivnost", "${connectivity?.state()}")
+                }
+                else if (connectivity?.state() == NetworkInfo.State.DISCONNECTED) {
+                    disconnected = true
+                    stopVideo() //if device is disconnected from wifi, stop the stream
+                }
             }
 
-        //calling a function every second - to check internet strength
         val handler = Handler(Looper.getMainLooper())
+        //the Runnable will execute on the thread to which this handler is attached - main in this case
         handler.postDelayed(object : Runnable {
             override fun run() {
-                checkInternetStrength()
-                handler.postDelayed(this, 1000)//1 sec delay
+                //checking internet speed only if device is connected to the internet
+                if (!disconnected) {
+                    //calling a function every second - to check internet strength
+                    viewModel.checkInternetSpeed()
+                }
+                handler.postDelayed(this, 1000) //1 second delay
             }
         }, 0)
 
-    }
-
-    fun checkInternetStrength() {
-        //downloading some file from the internet & calculate how long it took vs number of bytes in the file
-        val request = Request.Builder()
-            .url("https://publicobject.com/helloworld.txt")
-            .build()
-
-        //time before the request is made
-        startTime = System.currentTimeMillis()
-
-        client.newCall(request).enqueue(object: Callback {
-
-            override fun onFailure(call: Call?, e: IOException?) {
-                e?.printStackTrace()
-            }
-
-            @Throws(IOException::class)
-            override fun onResponse(call: Call, response: Response) {
-                if (!response.isSuccessful) throw IOException("Unexpected code $response")
-
-                /*val responseHeaders: Headers = response.headers()
-                var i = 0
-                val size: Int = responseHeaders.size()
-                while (i < size) {
-                    Log.d(TAG, responseHeaders.name(i).toString() + ": " + responseHeaders.value(i))
-                    i++
-                }*/
-
-                val input: InputStream = response.body().byteStream()
-
-                try {
-                    val bos = ByteArrayOutputStream()
-                    val buffer = ByteArray(1024)
-                    while (input.read(buffer) !== -1) {
-                        bos.write(buffer)
-                    }
-                    fileSize = bos.size().toLong()
-                } finally {
-                    input.close()
+        //observing changes of internet speed
+        viewModel.slowInternetSpeed().observe(this@MainActivity, Observer {
+            if (viewModel.slowInternetSpeed().value == true) {
+                runOnUiThread {
+                    //if speed is low, show the text view alert
+                    tvInternet.text = getString(R.string.poor_internet)
+                    tvInternet.visibility = View.VISIBLE
                 }
-                //time after request is completed
-                endTime = System.currentTimeMillis()
-
-                //calculate how long it took by subtracting end time from start time
-                val timeTakenMills =
-                    Math.floor((endTime - startTime).toDouble()) //time taken in milliseconds
-                val timeTakenSecs = timeTakenMills / 1000 //divide by 1000 to get time in seconds
-                val kilobytePerSec = Math.round(1024 / timeTakenSecs).toInt()
-                if (kilobytePerSec <= goodBandwidth) {
-                    // slow connection - we need to stop the robot
-                    //only the original thread that created a view hierarchy can touch its views
-                    runOnUiThread {
-                        tvNoInternet.text = "Poor internet connection. Robot is stopped!"
-                        tvNoInternet.visibility = View.VISIBLE
-                    }
-                } else {
-                    runOnUiThread {
-                        tvNoInternet.visibility = View.INVISIBLE
-                    }
+            } else {
+                runOnUiThread {
+                    tvInternet.visibility = View.INVISIBLE
                 }
-
-                //get the download speed by dividing the file size by time taken to download
-                val speed = fileSize / timeTakenMills
-                Log.d(TAG, "Time taken in secs: $timeTakenSecs")
-                Log.d(TAG, "kilobyte per sec: $kilobytePerSec")
-                Log.d(TAG, "Download Speed: $speed")
-                Log.d(TAG, "File size: $fileSize")
             }
         })
+    }
+
+    fun startVideo() {
+        tvInternet.visibility = View.INVISIBLE
+        libVlc = LibVLC(this);
+        _mediaPlayer = MediaPlayer(libVlc)
+        videoLayout = findViewById(R.id.videoLayout);
+
+        _mediaPlayer!!.attachViews(videoLayout!!, null, false, false)
+
+        val media = Media(libVlc, Uri.parse("rtsp://192.168.33.204:8554/mystream"))
+        media.setHWDecoderEnabled(true, false)
+        media.addOption(":network-caching=600")
+
+        _mediaPlayer!!.setMedia(media)
+        media.release()
+        _mediaPlayer!!.play()
+    }
+
+    fun stopVideo() {
+        tvInternet.text = getString(R.string.no_internet)
+        tvInternet.visibility = View.VISIBLE
+        if (_mediaPlayer != null) {
+            _mediaPlayer!!.stop()
+            _mediaPlayer!!.detachViews()
+            _mediaPlayer!!.release()
+            libVlc!!.release()
+            libVlc = null
+            _mediaPlayer = null
+        }
     }
 
     fun withItems(view: View) {
@@ -187,36 +170,8 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
         }
     }
 
-    fun startVideo() {
-        tvNoInternet.visibility = View.INVISIBLE
-        libVlc = LibVLC(this);
-        _mediaPlayer = MediaPlayer(libVlc)
-        videoLayout = findViewById(R.id.videoLayout);
-
-        _mediaPlayer!!.attachViews(videoLayout!!, null, false, false)
-
-        val media = Media(libVlc, Uri.parse("rtsp://192.168.119.158:8554/mystream"))
-        media.setHWDecoderEnabled(true, false)
-        media.addOption(":network-caching=600")
-
-        _mediaPlayer!!.setMedia(media)
-        media.release()
-        _mediaPlayer!!.play()
-    }
-
-    fun stopVideo() {
-        tvNoInternet.text = "No internet connection!"
-        tvNoInternet.visibility = View.VISIBLE
-        _mediaPlayer!!.stop()
-        _mediaPlayer!!.detachViews()
-        _mediaPlayer!!.release()
-        libVlc!!.release()
-        libVlc = null
-        _mediaPlayer = null
-    }
-
     override fun onJoystickMoved(xPercent: Float, yPercent: Float, id: Int) {
-        Log.d("Main aktivnost", "$xPercent, $yPercent")
+        Log.d(TAG, "$xPercent, $yPercent")
     }
 
     override fun onStop() {

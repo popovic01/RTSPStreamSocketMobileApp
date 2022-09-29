@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock.sleep
 import android.util.Log
 import android.view.View
 import android.view.Window
@@ -24,11 +25,13 @@ import com.github.pwittchen.reactivenetwork.library.rx2.Connectivity
 import com.github.pwittchen.reactivenetwork.library.rx2.ReactiveNetwork
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.*
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
 import java.io.OutputStream
+import java.lang.Runnable
 import java.net.Socket
 import java.nio.charset.Charset
 import java.util.*
@@ -45,7 +48,8 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
     private var libVlc: LibVLC? = null
 
     //for socket communication
-    private var client: Client? = null
+    private var client: MainActivityViewModel.Client? = null
+    private val scope = CoroutineScope(Dispatchers.IO + CoroutineName("Scope"))
 
     lateinit var tvInternet: TextView
     var disconnected: Boolean = false
@@ -71,15 +75,6 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
 
         tvInternet = findViewById(R.id.tvInternet)
 
-        Thread {
-            try {
-                client = Client("192.168.10.122", 7777)
-            } catch (e: Exception) {
-                Log.d("Konekcija", "${e.message}")
-            }
-            Log.d("Konekcija", "$client")
-        }.start()
-
         val joystickView = findViewById<JoystickView>(R.id.joystick)
         //code to make the view transparent
         joystickView.setZOrderOnTop(true)
@@ -94,11 +89,13 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
             .observeOn(AndroidSchedulers.mainThread()) //designate observer thread (main) - where the results are going to be observed from
             .subscribe { connectivity: Connectivity? ->
                 if (connectivity?.state() == NetworkInfo.State.CONNECTED) {
+                    scope.launch { client = MainActivityViewModel.Client("192.168.236.158", 7777) }
                     disconnected = false
                     startVideo() //if device is connected to wifi, start the stream
                 } else if (connectivity?.state() == NetworkInfo.State.DISCONNECTED) {
                     disconnected = true
                     stopVideo() //if device is disconnected from wifi, stop the stream
+                    client?.close() //closing the socket connection
                 }
             }
 
@@ -183,12 +180,12 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
     }
 
     override fun onJoystickMoved(xPercent: Float, yPercent: Float, id: Int) {
-        Log.d(TAG, "$xPercent, $yPercent")
-        val t = Thread {client?.run()}
-        t.start()
-        /*Thread {
-            client?.run()
-        }.start()*/
+        //Log.d(TAG, "$xPercent, $yPercent")
+        if (!disconnected) {
+            scope.launch {
+                client?.write(xPercent, yPercent)
+            }
+        }
     }
 
     override fun onStop() {
@@ -201,60 +198,5 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
         super.onDestroy()
         _mediaPlayer!!.release()
         libVlc!!.release()
-    }
-
-    class Client(address: String, port: Int) {
-        private val connection: Socket = Socket(address, port)
-        private var connected: Boolean = false
-
-        init {
-            Log.d("Konekcija","Connected to the server at $address on port $port")
-        }
-
-        private val reader: Scanner = Scanner(connection.getInputStream())
-        private val writer: OutputStream = connection.getOutputStream()
-
-        fun run() {
-            //thread { run() }
-            connected = true
-            while (connected) {
-                write("Koordinate")
-                /*while (reader.hasNextLine()) {
-                    read()
-                }*/
-                /*val input = readLine() ?: ""
-                //print(input)
-                if ("exit" in input) {
-                    connected = false
-                    reader.close()
-                    connection.close()
-                    println("Connected")
-                } else {
-                    println("Not connected")
-                    write(input)
-                }*/
-            }
-            /*connected = false
-            reader.close()
-            connection.close()*/
-            Log.d("Konekcija","Connection closed")
-        }
-
-        private fun write(message: String) {
-            writer.write((message).toByteArray(Charset.defaultCharset()))
-        }
-
-        fun close() {
-            connection.close()
-        }
-
-        private fun read() {
-            try {
-                Log.d("Konekcija", reader.nextLine())
-            } catch (e: NoSuchElementException) {
-                Log.d("Konekcija","There is no next line")
-            }
-        }
-
     }
 }

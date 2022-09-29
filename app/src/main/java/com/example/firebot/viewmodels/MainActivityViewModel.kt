@@ -74,68 +74,51 @@ class MainActivityViewModel : ViewModel() {
                 val timeTakenSecs = timeTakenMills / 1000 //divide by 1000 to get time in seconds
                 val kilobytePerSec = Math.round(1024 / timeTakenSecs).toInt()
                 if (kilobytePerSec <= goodBandwidth) {
-                    // slow connection - we need to stop the robot
+                    //slow connection - we need to stop the robot
                     //only the original thread that created a view hierarchy can touch its views
                     _slowInternetSpeed.postValue(true)
                 } else
                     _slowInternetSpeed.postValue(false)
                 //get the download speed by dividing the file size by time taken to download
-                val speed = fileSize / timeTakenMills
+                /*val speed = fileSize / timeTakenMills
                 Log.d(TAG, "Time taken in secs: $timeTakenSecs")
                 Log.d(TAG, "kilobyte per sec: $kilobytePerSec")
                 Log.d(TAG, "Download Speed: $speed")
-                Log.d(TAG, "File size: $fileSize")
+                Log.d(TAG, "File size: $fileSize")*/
             }
         })
     }
 
     class Client(address: String, port: Int) {
         private val connection: Socket = Socket(address, port)
-        private var connected: Boolean = false
 
-        /*init {
-            println("Connected to the server at $address on port $port")
-        }*/
+        init {
+            Log.d("Konekcija","Connected to the server at $address on port $port")
+        }
 
-        /*private val reader: Scanner = Scanner(connection.getInputStream())
-        private val writer: OutputStream = connection.getOutputStream()*/
+        private val reader: Scanner = Scanner(connection.getInputStream())
+        private val writer: OutputStream = connection.getOutputStream()
 
-        /*fun run() {
-            connected = true
-            while (connected) {
-                write("Koordinate")
-                /*while (reader.hasNextLine()) {
-                    read()
-                }*/
-                connected = false
-                reader.close()
-                connection.close()
-                println("Connection closed")
-                /*val input = readLine() ?: ""
-                //print(input)
-                if ("exit" in input) {
-                    connected = false
-                    reader.close()
-                    connection.close()
-                    println("Connected")
-                } else {
-                    println("Not connected")
-                    write(input)
-                }*/
-            }
-        }*/
+        fun write(xPercent: Float, yPercent: Float) {
+            val msg = "K: $xPercent, $yPercent"
+            //msg = "${msg.length}" + " ".repeat(10-msg.length.toString().count()) + msg
+            //println("${msg}, ${msg.length}")
+            writer.write((msg + "\n").toByteArray(Charset.defaultCharset()), 0, msg.length)
+        }
 
-        /*private fun write(message: String) {
-            writer.write((message).toByteArray(Charset.defaultCharset()))
+        fun close() {
+            reader.close()
+            writer.close()
+            connection.close()
         }
 
         private fun read() {
             try {
-                println(reader.nextLine())
+                Log.d("Konekcija", reader.nextLine())
             } catch (e: NoSuchElementException) {
-                println("There is no next line")
+                Log.d("Konekcija","There is no next line")
             }
-        }*/
+        }
 
     }
 

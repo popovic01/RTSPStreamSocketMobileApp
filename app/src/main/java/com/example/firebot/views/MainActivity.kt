@@ -25,6 +25,10 @@ import com.github.pwittchen.reactivenetwork.library.rx2.Connectivity
 import com.github.pwittchen.reactivenetwork.library.rx2.ReactiveNetwork
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import okhttp3.*
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
@@ -46,6 +50,9 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
 
     lateinit var tvInternet: TextView
     var disconnected: Boolean = false
+
+    val scope = CoroutineScope(Dispatchers.IO + CoroutineName("Scope"))
+    var client: MainActivityViewModel.Client? = null
 
     private val negativeButtonClick = { dialog: DialogInterface, which: Int -> }
     private var currentCamera = "RGB"
@@ -82,12 +89,14 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
             .observeOn(AndroidSchedulers.mainThread()) //designate observer thread (main) - where the results are going to be observed from
             .subscribe { connectivity: Connectivity? ->
                 if (connectivity?.state() == NetworkInfo.State.CONNECTED) {
+                    scope.launch { client = MainActivityViewModel.Client("192.168.236.158", 7777) }
                     disconnected = false
                     startVideo() //if device is connected to wifi, start the stream
                 }
                 else if (connectivity?.state() == NetworkInfo.State.DISCONNECTED) {
                     disconnected = true
                     stopVideo() //if device is disconnected from wifi, stop the stream
+                    client?.close()
                 }
             }
 
@@ -155,7 +164,8 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
         val builder = AlertDialog.Builder(this)
         with(builder)
         {
-            setTitle("List of available cameras")
+            setTitle(
+                "List of available cameras")
             setItems(items) { dialog, which ->
                 if (currentCamera == items[which])
                     Toast.makeText(applicationContext, "$currentCamera is already selected", Toast.LENGTH_SHORT).show()
@@ -172,6 +182,9 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
 
     override fun onJoystickMoved(xPercent: Float, yPercent: Float, id: Int) {
         Log.d(TAG, "$xPercent, $yPercent")
+        if (!disconnected) {
+            scope.launch { client?.write(xPercent, yPercent) }
+        }
     }
 
     override fun onStop() {

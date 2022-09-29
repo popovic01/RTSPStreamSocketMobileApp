@@ -8,11 +8,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock.sleep
 import android.util.Log
 import android.view.View
 import android.view.Window
 import android.view.WindowManager
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -25,18 +25,15 @@ import com.github.pwittchen.reactivenetwork.library.rx2.Connectivity
 import com.github.pwittchen.reactivenetwork.library.rx2.ReactiveNetwork
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.schedulers.Schedulers
-import kotlinx.coroutines.*
+import okhttp3.*
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
-import java.io.OutputStream
-import java.lang.Runnable
-import java.net.Socket
-import java.nio.charset.Charset
-import java.util.*
-import kotlin.NoSuchElementException
-import kotlin.concurrent.thread
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.InputStream
+
 
 class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
 
@@ -46,10 +43,6 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
     private var _mediaPlayer: MediaPlayer? = null
     private var videoLayout: VLCVideoLayout? = null
     private var libVlc: LibVLC? = null
-
-    //for socket communication
-    private var client: MainActivityViewModel.Client? = null
-    private val scope = CoroutineScope(Dispatchers.IO + CoroutineName("Scope"))
 
     lateinit var tvInternet: TextView
     var disconnected: Boolean = false
@@ -89,13 +82,12 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
             .observeOn(AndroidSchedulers.mainThread()) //designate observer thread (main) - where the results are going to be observed from
             .subscribe { connectivity: Connectivity? ->
                 if (connectivity?.state() == NetworkInfo.State.CONNECTED) {
-                    scope.launch { client = MainActivityViewModel.Client("192.168.236.158", 7777) }
                     disconnected = false
                     startVideo() //if device is connected to wifi, start the stream
-                } else if (connectivity?.state() == NetworkInfo.State.DISCONNECTED) {
+                }
+                else if (connectivity?.state() == NetworkInfo.State.DISCONNECTED) {
                     disconnected = true
                     stopVideo() //if device is disconnected from wifi, stop the stream
-                    client?.close() //closing the socket connection
                 }
             }
 
@@ -114,7 +106,6 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
 
         //observing changes of internet speed
         viewModel.slowInternetSpeed().observe(this@MainActivity, Observer {
-            //viewModel.slowInternetSpeed().value == true = it
             if (viewModel.slowInternetSpeed().value == true) {
                 runOnUiThread {
                     //if speed is low, show the text view alert
@@ -180,12 +171,7 @@ class MainActivity : AppCompatActivity(), JoystickView.JoystickListener {
     }
 
     override fun onJoystickMoved(xPercent: Float, yPercent: Float, id: Int) {
-        //Log.d(TAG, "$xPercent, $yPercent")
-        if (!disconnected) {
-            scope.launch {
-                client?.write(xPercent, yPercent)
-            }
-        }
+        Log.d(TAG, "$xPercent, $yPercent")
     }
 
     override fun onStop() {
